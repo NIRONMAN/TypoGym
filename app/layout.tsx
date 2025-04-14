@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Ubuntu_Mono, Patrick_Hand } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const ubuntu = Ubuntu_Mono({
+  variable: "--font-mono", weight: "400",
+  subsets: ["latin"]
+
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const patrick = Patrick_Hand({
+  variable: "--font-patrick-hand",
   subsets: ["latin"],
+  weight: "400"
 });
 
 export const metadata: Metadata = {
@@ -25,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${patrick.className} ${ubuntu.variable} antialiased`}
       >
         {children}
       </body>

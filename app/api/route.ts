@@ -1,0 +1,33 @@
+const wordsList={
+    "a": ["apple", "amass", "arena", "alarm", "adapt", "abandon", "award", "affair", "appeal", "attack", "amaze", "assign", "assume", "attain", "advantage", "affect", "arrange", "against", "assess", "average"],
+    "b": ["bubble", "babble", "backbone", "barbell", "bamboo", "baboon", "bareback", "blackboard", "blueberry", "bomber", "bramble", "babysit", "barrack", "buzzing", "bobbin", "backfire", "barbaric", "bobble", "backpack", "brother"],
+    "c": ["cactus", "cancel", "cackle", "cabin", "cascade", "captive", "cater", "circus", "carpet", "coconut", "council", "crochet", "cuddle", "cylinder", "concert", "copper", "crackle", "crucial", "crystal", "current"],
+    "d": ["daddy", "doodle", "dandelion", "dodge", "doodle", "damp", "dawdle", "dandelion", "dread", "drizzle", "dungeon", "dimple", "drowsy", "duster", "dazzle", "deadline", "dismantle", "droplet", "duckling", "diligent"],
+    "e": ["eager", "eerie", "elevate", "envelope", "elephant", "energetic", "emerge", "essence", "exceed", "exercise", "extreme", "eclipse", "estimate", "empathy", "embrace", "enchant", "enable", "endless", "enlighten", "entangle"],
+    "f": ["fluffy", "flutter", "faffing", "furnace", "fashion", "forever", "fisherman", "fragile", "fracture", "forfeit", "feedback", "forgive", "frequent", "fracture", "forecast", "freedom", "flicker", "flawless", "flooded", "flutter"],
+    "g": ["giggle", "gargle", "gadget", "gallop", "gather", "goggles", "gobble", "garage", "gorgeous", "gigabyte", "glimmer", "glitter", "giraffe", "glimpse", "gliding", "gloomy", "ground", "grizzle", "grapple", "grumble"],
+    "h": ["hahaha", "hammer", "hollow", "habit", "helmet", "honest", "hassle", "hunger", "heaven", "humble", "hurdle", "hijack", "harmony", "horizon", "hostel", "hurdle", "hydrate", "harvest", "husband", "hundred"],
+    "i": ["inside", "ignite", "image", "insist", "invite", "icing", "inquire", "invisible", "illusion", "impress", "impact", "imitate", "incline", "ignite", "illness", "install", "inspired", "interest", "involved", "initial"],
+    "j": ["juggle", "jacket", "jigsaw", "jelly", "jargon", "juniper", "jester", "jolting", "joking", "journey", "jumbled", "jumper", "jealous", "joyful", "jungle", "justice", "jovial", "jointly", "jumpy", "judging"],
+    "k": ["kettle", "kitten", "kicker", "kingdom", "kneecap", "kitchen", "knocker", "kicking", "keystone", "kidnap", "knotty", "krypton", "keypad", "kangaroo", "keeper", "knuckle", "knitted", "knapsack", "kindred", "kilogram"],
+    "l": ["lively", "lullaby", "lovely", "limitless", "liberty", "lifeline", "longing", "lighthouse", "luscious", "luminary", "leaflet", "laughter", "luxury", "latitude", "littered", "lagoon", "lavish", "landing", "legend", "lighter"],
+    "m": ["mammal", "murmur", "mimic", "momentum", "madman", "midway", "memento", "migrate", "milkman", "magnify", "manifest", "mountain", "morning", "meadow", "melody", "miracle", "mockery", "mystery", "movement", "moisten"],
+    "n": ["nanny", "nonsense", "narrow", "nugget", "napkin", "nickname", "novelty", "nephew", "necktie", "nursery", "network", "neither", "neutron", "neglect", "notable", "navigate", "nickname", "nurture", "nobleman", "nostril"],
+    "o": ["orange", "oblong", "octagon", "outlook", "optimize", "ongoing", "overtime", "opposite", "outburst", "outcome", "overcome", "oxidize", "orphan", "outpace", "outplay", "outlaw", "outgrow", "outshine", "overjoy", "outcry"],
+    "p": ["pepper", "puppet", "poppet", "pupil", "popcorn", "puppy", "paddle", "pocket", "pattern", "purple", "picture", "publish", "payment", "product", "promise", "printer", "package", "precise", "pleasant", "proudly"],
+    "q": ["quicker", "quieter", "quibble", "quilted", "quizzed", "quaking", "quirked", "qualify", "quarry", "quicken", "queerly", "quicker", "quieter", "quitter", "quoting", "quaint", "quorum", "quarter", "quench", "quality"],
+    "r": ["racer", "reader", "ranger", "rescue", "retrace", "reorder", "recall", "recover", "remark", "relate", "refine", "rebuild", "resist", "restore", "relax", "repeat", "rebound", "refresh", "retire", "revolve"],
+    "s": ["sassy", "senses", "sister", "stress", "sassy", "serene", "scatter", "sustain", "sizzling", "sunset", "surface", "satisfy", "suspend", "seaside", "scooter", "scratch", "shimmer", "shelter", "snippet", "spindle"],
+    "t": ["tattoo", "tattle", "teacher", "tremble", "throttle", "traffic", "tremor", "tender", "tonight", "transfer", "tornado", "tribute", "treasure", "turbine", "trolley", "trustee", "twinkle", "trouble", "temper", "trinity"],
+    "u": ["unusual", "upwards", "uniform", "unfold", "uproot", "upheave", "upgrade", "upstart", "unveil", "uncork", "undergo", "upstage", "unwind", "uplift", "undoing", "upscale", "uplink", "uncover", "utmost", "upturn"],
+    "v": ["vivid", "village", "valley", "venture", "vibrate", "victory", "vulture", "vanish", "velvet", "volcano", "vortex", "vaccine", "voucher", "vanguard", "vintage", "verbose", "visage", "violate", "verdict", "voyage"],
+    "w": ["wallow", "warrior", "waddle", "whistle", "wonder", "wrestle", "waffle", "wander", "whisper", "wrinkle", "window", "workout", "wildcat", "woeful", "weather", "windmill", "warmth", "wrestler", "welcome", "wrapper"],
+    "x": ["xenon", "xerox", "xylophone", "xenophobia", "xanadu", "xylitol", "xenogenic", "xenial", "xenolithic", "xiphoid", "xenodochial", "xenograft", "xylophonist", "xanthic", "xenomorph", "xenotropic", "xylophagous", "xenoblast", "xenogamy", "xylan"],
+    "y": ["yellow", "yonder", "yearly", "yogurt", "yawned", "yankee", "yield", "yippee", "youngster", "yachting", "yearn", "yodel", "yolk", "yank", "yapping", "yardstick", "yowling", "yummiest", "yearbook", "youthful"],
+    "z": ["zebra", "zombie", "zealous", "zeppelin", "zodiac", "zippy", "zinger", "zesty", "zenith", "zero", "zillion", "zigzag", "zucchini", "zap", "zone", "zephyr", "zipline", "zooming", "zapped", "zookeeper"]
+  }
+
+  export function GET(){
+        return  Response.json(wordsList,{status:200});
+  }
+  

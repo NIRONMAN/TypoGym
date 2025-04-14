@@ -1,16 +1,26 @@
+import { useTypingSession } from '@/store';
 import React, { useEffect, useState } from 'react'
 
 function Terminal() {
-    const [current, Setcurrent] = useState(0);
     const [isError, setIsError] = useState(false);
-    const [isstarted, setIsstarted] = useState(false);
-    const words = "apple bicycle harmony glacier envelope quantum sunflower notebook thunder melody giraffe lantern sapphire canyon cricket fossil whisper velvet rainbow orbit shadow castle comet maple tapestry"
+    const {alphabetSession,currentSessionString,currentLetterIndex,setCurrentIndex,isSessionStarted,toggleSessionStart}=useTypingSession();
+    const [terminalBlur,setTerminalBlur]=useState(false);
+
+    useEffect(()=>{
+        // (async ()=>{
+        //     const {data}=await nixios.get("api");
+        //     console.log(data)
+           
+        // })();
+
+        alphabetSession("a");
+    },[])
 
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
             if (e.key === "/") {
                 e.preventDefault();
-                setIsstarted((prev) => !prev);
+                toggleSessionStart();
             }
 
         }
@@ -24,17 +34,17 @@ function Terminal() {
 
     useEffect(() => {
 
-        if (!isstarted) {
+        if (!isSessionStarted && !currentSessionString) {
             return;
         }
         function handleKeyDown2(e: KeyboardEvent) {
-            if (e.key === words[current]) {
-                Setcurrent(prev => (prev + 1) % words.length);
+            if (e.key === currentSessionString![currentLetterIndex]) {
+                setCurrentIndex((currentLetterIndex+1) % currentSessionString!.length);
                 setIsError(false)
             }
             else if (e.key === "Backspace") {
-                if(current>0){
-                    Setcurrent(prev => prev - 1 );
+                if(currentLetterIndex>0){
+                    setCurrentIndex(currentLetterIndex- 1 );
                 }
                 setIsError(false);
             }
@@ -47,22 +57,26 @@ function Terminal() {
         return () => {
             document.removeEventListener('keydown', handleKeyDown2);
         }
-    }, [current, isstarted])
+    }, [currentLetterIndex, isSessionStarted])
 
 
     return (
-        <div id='Terminal' className=' bg-[#29282b] h-[50%] w-[80%] text-white rounded-2xl border-2 p-6'>
+        <div
+        tabIndex={0}
+        onFocus={()=>setTerminalBlur(false)}
+        onBlur={()=>setTerminalBlur(true)}
+         id='Terminal' className={`font-mono  bg-[#29282b] w-full text-white rounded-2xl border-2 p-6 min-h-60 ${terminalBlur?"blur-sm":"border-green-300"}`}>
             {
-                isstarted ?
-                    words.split("").map((ele, index) => (
+                isSessionStarted && currentSessionString ?
+                    currentSessionString.split("").map((ele, index) => (
                         <span key={index} id={index.toString()} className={`
               text-xl
-            ${current === index && " border-b-4 border-black"}
-            ${current > index && "text-gray-500"}
-            ${isError && current === index && "text-red-400"}
+            ${currentLetterIndex === index && " border-b-4 border-black"}
+            ${currentLetterIndex > index && "text-gray-500"}
+            ${isError && currentLetterIndex === index && "text-red-400"}
 
             `}>
-                            {ele}
+                    {ele}
                         </span>
                     ))
                     : <div className="text-center">Type /start here...</div>
@@ -72,3 +86,4 @@ function Terminal() {
 }
 
 export default Terminal
+
