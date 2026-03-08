@@ -1,22 +1,51 @@
-import { CharKeyType, useTypingSession } from '@/store';
-import React from 'react'
-//65
+"use client";
+
+import { ALPHABET } from "@/lib/typingEngine";
+import { useTypingSession } from "@/store";
+
 function AlphabetGrid() {
-  const alphabetSession =useTypingSession((state)=>state.alphabetSession);
+  const mode = useTypingSession((state) => state.config.mode);
+  const targetType = useTypingSession((state) => state.config.targetType);
+  const targetId = useTypingSession((state) => state.config.targetId);
+  const setTargetType = useTypingSession((state) => state.setTargetType);
+  const setTargetId = useTypingSession((state) => state.setTargetId);
+
+  if (mode !== "targeted" || targetType !== "letter") {
+    return null;
+  }
 
   return (
-    <div className=' flex my-4  rounded-lg items-center justify-center'>
-      {
-        Array.from({ length: 26 }, (_, i) => {
-          return <div key={i} onClick={()=>{
-            alphabetSession(String.fromCharCode(97+i) as CharKeyType)
-          }} className='hover:scale-110 me-2 border border-gray-500 py-1 px-2 bg-neutral-600 hover:bg-neutral-400 rounded-md'>
-              {String.fromCharCode(65+i)}
-          </div>
-        })
-      }
-    </div>
-  )
+    <section className="rounded-xl border border-slate-700 bg-[#10141a] p-3">
+      <div className="mb-2 text-xs font-mono tracking-wide text-slate-400">
+        LETTER TARGET GRID
+      </div>
+      <div
+        className="grid gap-2 max-[900px]:grid-cols-8 max-[560px]:grid-cols-6"
+        style={{ gridTemplateColumns: "repeat(13, minmax(0, 1fr))" }}
+      >
+        {ALPHABET.map((letter) => {
+          const selected = targetId === letter;
+          return (
+            <button
+              key={letter}
+              type="button"
+              onClick={() => {
+                setTargetType("letter");
+                setTargetId(letter);
+              }}
+              className={`rounded border px-2 py-1 font-mono text-sm transition ${
+                selected
+                  ? "border-cyan-300 bg-cyan-300/20 text-cyan-100"
+                  : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"
+              }`}
+            >
+              {letter.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
-export default AlphabetGrid
+export default AlphabetGrid;
