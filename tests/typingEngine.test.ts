@@ -25,7 +25,7 @@ test("corpora are valid for all letters", () => {
     for (const letter of ALPHABET) {
       const entries = corpus.data[letter];
       assert.ok(Array.isArray(entries), `${corpus.name}:${letter} missing list`);
-      assert.ok(entries.length >= 8, `${corpus.name}:${letter} should include at least 8 words`);
+      assert.ok(entries.length >= 20, `${corpus.name}:${letter} should include at least 20 words`);
 
       const normalized = entries.map((entry) => entry.toLowerCase());
       const unique = new Set(normalized);
@@ -34,29 +34,37 @@ test("corpora are valid for all letters", () => {
         normalized.every((entry) => entry.includes(letter)),
         `${corpus.name}:${letter} has words without the key letter`,
       );
+      assert.ok(
+        normalized.every((entry) => /^[a-z]+$/.test(entry)),
+        `${corpus.name}:${letter} contains non-alphabetic words`,
+      );
     }
   }
 });
 
-test("generateNormalPrompt respects duration sizing", () => {
+test("generateNormalPrompt respects duration sizing and uses 100% real words", () => {
   const config: SessionConfig = {
     mode: "normal",
     durationSec: 60,
-    corpusMix: { real: 0.7, artificial: 0.3 },
+    corpusMix: { real: 1.0, artificial: 0.0 },
   };
 
   const prompt = generateNormalPrompt(config);
-  const words = prompt.split(" ");
+  const wordsList = prompt.split(" ");
 
-  assert.ok(words.length >= 20);
-  assert.equal(words.some((word) => word.length > 0), true);
+  assert.ok(wordsList.length >= 20);
+  assert.equal(wordsList.some((word) => word.length > 0), true);
+  // Ensure every generated word consists of valid English letters
+  for (const word of wordsList) {
+    assert.ok(/^[a-z]{3,14}$/.test(word), `Generated unexpected word format: ${word}`);
+  }
 });
 
 test("generateNormalPrompt covers all letters in long prompts", () => {
   const config: SessionConfig = {
     mode: "normal",
     durationSec: 60,
-    corpusMix: { real: 0.7, artificial: 0.3 },
+    corpusMix: { real: 1.0, artificial: 0.0 },
   };
 
   const prompt = generateNormalPrompt(config);
@@ -69,17 +77,17 @@ test("generateTargetedPrompt biases target letters", () => {
   const config: SessionConfig = {
     mode: "targeted",
     durationSec: 60,
-    corpusMix: { real: 0.7, artificial: 0.3 },
+    corpusMix: { real: 1.0, artificial: 0.0 },
     targetType: "letter",
     targetId: "q",
   };
 
   const prompt = generateTargetedPrompt(config, ["q"]);
-  const words = prompt.split(" ").filter((word) => word.length > 0);
-  const qWords = words.filter((word) => word.includes("q"));
+  const wordsList = prompt.split(" ").filter((word) => word.length > 0);
+  const qWords = wordsList.filter((word) => word.includes("q"));
 
   assert.ok(prompt.length > 0);
-  assert.ok(qWords.length >= Math.floor(words.length * 0.3));
+  assert.ok(qWords.length >= Math.floor(wordsList.length * 0.3));
 });
 
 test("calculateMetrics computes expected numbers", () => {

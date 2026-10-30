@@ -65,7 +65,7 @@ interface TypingEngineState {
 const DEFAULT_CONFIG: SessionConfig = {
   mode: "normal",
   durationSec: 60,
-  corpusMix: { real: 0.7, artificial: 0.3 },
+  corpusMix: { real: 1.0, artificial: 0.0 },
   targetType: "letter",
   targetId: "a",
 };
@@ -292,6 +292,7 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
       if (state.cursorIndex > 0) {
         set({
           cursorIndex: state.cursorIndex - 1,
+          correctChars: Math.max(0, state.correctChars - 1),
           currentError: false,
           charFocusStartedAt: ts,
         });

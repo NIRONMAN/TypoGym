@@ -119,21 +119,37 @@ function normalizeWord(word: string): string {
   return word.toLowerCase().trim().replace(/[^a-z]/g, "");
 }
 
+const REAL_FALLBACK_WORDS: Record<Letter, string[]> = {
+  a: ["about", "after", "again", "almost", "always", "answer"],
+  b: ["before", "better", "between", "black", "bring", "bright"],
+  c: ["change", "circle", "clean", "clear", "close", "common"],
+  d: ["dance", "decide", "direct", "discover", "divide", "doctor"],
+  e: ["early", "earth", "effect", "either", "enough", "every"],
+  f: ["family", "father", "field", "figure", "finger", "friend"],
+  g: ["garden", "gather", "general", "gentle", "glance", "ground"],
+  h: ["happen", "harbor", "health", "heart", "history", "humble"],
+  i: ["inside", "island", "impact", "image", "intend", "invite"],
+  j: ["jacket", "journey", "joyful", "junior", "justice", "adjust"],
+  k: ["kitchen", "kitten", "knight", "knock", "knuckle", "kingdom"],
+  l: ["ladder", "language", "laughter", "leader", "legacy", "little"],
+  m: ["machine", "market", "matter", "meadow", "memory", "middle"],
+  n: ["narrow", "native", "nature", "nearly", "network", "number"],
+  o: ["object", "observe", "office", "online", "orange", "outcome"],
+  p: ["paddle", "palace", "pencil", "people", "person", "planet"],
+  q: ["quick", "quiet", "quaint", "quench", "quiver", "equal"],
+  r: ["rabbit", "random", "rapid", "reason", "recent", "record"],
+  s: ["safety", "school", "screen", "search", "season", "secret"],
+  t: ["talent", "target", "teacher", "temple", "tennis", "travel"],
+  u: ["umbrella", "unable", "uncle", "under", "unique", "useful"],
+  v: ["vacant", "valley", "velvet", "venture", "vibrant", "village"],
+  w: ["wallet", "warmth", "warrior", "weather", "window", "winter"],
+  x: ["extra", "exact", "expect", "expert", "relax", "complex"],
+  y: ["yellow", "yearly", "yeast", "yonder", "young", "journey"],
+  z: ["blaze", "breeze", "freeze", "puzzle", "wizard", "zephyr"],
+};
+
 function fallbackWordsForLetter(letter: Letter): string[] {
-  if (letter === "q") {
-    return ["quava", "quimer", "quonat", "quidel", "qumora", "quvex"];
-  }
-  if (letter === "x") {
-    return ["xanor", "xevik", "xolum", "xirad", "xupet", "xemal"];
-  }
-  return [
-    `${letter}avor`,
-    `${letter}emid`,
-    `${letter}inul`,
-    `${letter}orat`,
-    `${letter}upel`,
-    `${letter}elix`,
-  ];
+  return REAL_FALLBACK_WORDS[letter] ?? ["quick", "brave", "relax", "bright", "jump"];
 }
 
 function sanitizeCorpus(source: Record<Letter, string[]>): CorpusByLetter {
@@ -183,7 +199,7 @@ function clampMix(mix: SessionConfig["corpusMix"]): SessionConfig["corpusMix"] {
   const sum = real + artificial;
 
   if (sum === 0) {
-    return { real: 0.7, artificial: 0.3 };
+    return { real: 1.0, artificial: 0.0 };
   }
 
   return {
