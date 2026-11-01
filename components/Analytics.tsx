@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { ALPHABET, buildProgressSummary, Letter, rankWeakLetters } from "@/lib/typingEngine";
+import {
+  ALPHABET,
+  buildProgressSummary,
+  calculateSessionDelta,
+  Letter,
+  rankWeakLetters,
+} from "@/lib/typingEngine";
 import { useTypingSession } from "@/store";
 
 interface AnalyticsProps {
@@ -16,11 +22,13 @@ export default function Analytics({ onRestart, onSelectTargetLetter }: Analytics
   const restartSession = useTypingSession((state) => state.restartSession);
   const openAnalytics = useTypingSession((state) => state.openAnalytics);
   const startTargetedDrill = useTypingSession((state) => state.startTargetedDrill);
-  const getLastResultDelta = useTypingSession((state) => state.getLastResultDelta);
 
   const summary = useMemo(() => buildProgressSummary(sessionHistory, 7), [sessionHistory]);
   const weakLetters = useMemo(() => rankWeakLetters(letterStats, 5), [letterStats]);
-  const delta = useMemo(() => getLastResultDelta(), [getLastResultDelta]);
+  const delta = useMemo(
+    () => (lastResult ? calculateSessionDelta(lastResult, sessionHistory, letterStats) : null),
+    [lastResult, sessionHistory, letterStats],
+  );
 
   const topWeakLetter = weakLetters[0]?.letter;
 

@@ -96,6 +96,7 @@ const DEFAULT_CONFIG: SessionConfig = {
   corpusMix: { real: 1.0, artificial: 0.0 },
   targetType: "letter",
   targetId: "a",
+  targetLetters: ["a"],
 };
 
 function persistProgress(data: PersistedProgress) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { ALPHABET, Letter, TargetType } from "@/lib/typingEngine";
+import { ALPHABET, getAdaptiveWorkoutLetters, Letter, TargetType } from "@/lib/typingEngine";
 import { useTypingSession } from "@/store";
 
 const FINGER_LABELS: Record<string, string> = {
@@ -15,18 +15,20 @@ const FINGER_LABELS: Record<string, string> = {
   "right-pinky": "R-Pinky",
 };
 
+const EMPTY_TARGET_LETTERS: Letter[] = [];
+
 export default function AlphabetGrid() {
   const mode = useTypingSession((state) => state.config.mode);
-  const targetType = useTypingSession((state) => state.config.targetType ?? "letter");
+  const targetType = useTypingSession((state) => state.config.targetType) ?? "letter";
   const targetId = useTypingSession((state) => state.config.targetId);
-  const targetLetters = useTypingSession((state) => state.config.targetLetters ?? []);
+  const rawTargetLetters = useTypingSession((state) => state.config.targetLetters);
+  const targetLetters = rawTargetLetters ?? EMPTY_TARGET_LETTERS;
   const setTargetType = useTypingSession((state) => state.setTargetType);
   const setTargetId = useTypingSession((state) => state.setTargetId);
   const setTargetLetters = useTypingSession((state) => state.setTargetLetters);
   const letterStats = useTypingSession((state) => state.letterStats);
-  const getAdaptiveLetters = useTypingSession((state) => state.getAdaptiveLetters);
 
-  const adaptive = useMemo(() => getAdaptiveLetters(), [getAdaptiveLetters]);
+  const adaptive = useMemo(() => getAdaptiveWorkoutLetters(letterStats), [letterStats]);
 
   if (mode !== "targeted") {
     return null;

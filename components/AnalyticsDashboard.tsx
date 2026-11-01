@@ -3,8 +3,13 @@
 import { useMemo, useState, useEffect } from "react";
 import {
   ALPHABET,
+  buildConsistencyCalendar,
+  buildProgressSummary,
+  calculateStreak,
   FINGER_MAP,
   FingerId,
+  getAdaptiveWorkoutLetters,
+  getLetterMastery,
   Letter,
   MasteryTier,
 } from "@/lib/typingEngine";
@@ -33,11 +38,6 @@ export default function AnalyticsDashboard() {
   const closeAnalytics = useTypingSession((state) => state.closeAnalytics);
   const letterStats = useTypingSession((state) => state.letterStats);
   const sessionHistory = useTypingSession((state) => state.sessionHistory);
-  const getStreak = useTypingSession((state) => state.getStreak);
-  const getCalendar = useTypingSession((state) => state.getCalendar);
-  const getMastery = useTypingSession((state) => state.getMastery);
-  const getAdaptiveLetters = useTypingSession((state) => state.getAdaptiveLetters);
-  const getProgressSummary = useTypingSession((state) => state.getProgressSummary);
   const startTargetedDrill = useTypingSession((state) => state.startTargetedDrill);
 
   // Active section tab in dashboard
@@ -66,11 +66,14 @@ export default function AnalyticsDashboard() {
   }, [isOpen, closeAnalytics]);
 
   // Derived metrics
-  const streak = useMemo(() => getStreak(), [getStreak]);
-  const calendarDays = useMemo(() => getCalendar(12), [getCalendar]);
-  const masteryList = useMemo(() => getMastery(), [getMastery]);
-  const adaptiveLetters = useMemo(() => getAdaptiveLetters(), [getAdaptiveLetters]);
-  const summary = useMemo(() => getProgressSummary(7), [getProgressSummary]);
+  const streak = useMemo(() => calculateStreak(sessionHistory), [sessionHistory]);
+  const calendarDays = useMemo(() => buildConsistencyCalendar(sessionHistory, 12), [sessionHistory]);
+  const masteryList = useMemo(
+    () => ALPHABET.map((letter) => getLetterMastery(letterStats[letter])),
+    [letterStats],
+  );
+  const adaptiveLetters = useMemo(() => getAdaptiveWorkoutLetters(letterStats), [letterStats]);
+  const summary = useMemo(() => buildProgressSummary(sessionHistory, 7), [sessionHistory]);
 
   const weakLettersCount = useMemo(() => {
     return masteryList.filter(

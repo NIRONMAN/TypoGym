@@ -1,7 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { Letter, PracticeMode } from "@/lib/typingEngine";
+import {
+  calculateStreak,
+  getAdaptiveWorkoutLetters,
+  Letter,
+  PracticeMode,
+} from "@/lib/typingEngine";
 import { useTypingSession } from "@/store";
 
 const DURATIONS = [15, 30, 60, 120];
@@ -24,16 +29,15 @@ export function TopControls() {
   const setMode = useTypingSession((state) => state.setMode);
   const setDuration = useTypingSession((state) => state.setDuration);
   const openAnalytics = useTypingSession((state) => state.openAnalytics);
-  const getStreak = useTypingSession((state) => state.getStreak);
+  const sessionHistory = useTypingSession((state) => state.sessionHistory);
   const letterStats = useTypingSession((state) => state.letterStats);
-  const getAdaptiveLetters = useTypingSession((state) => state.getAdaptiveLetters);
   const startTargetedDrill = useTypingSession((state) => state.startTargetedDrill);
 
   const isRunning = status === "running";
   const clockSeconds = status === "idle" ? config.durationSec : remainingSec;
 
-  const streak = useMemo(() => getStreak(), [getStreak]);
-  const adaptive = useMemo(() => getAdaptiveLetters(), [getAdaptiveLetters]);
+  const streak = useMemo(() => calculateStreak(sessionHistory), [sessionHistory]);
+  const adaptive = useMemo(() => getAdaptiveWorkoutLetters(letterStats), [letterStats]);
 
   // Identify primary weak letter
   const primaryWeak = adaptive.weakLetters[0] as Letter | undefined;
