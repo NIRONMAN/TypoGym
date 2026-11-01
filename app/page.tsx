@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AlphabetGrid from "@/components/AlphabetGrid";
+import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import { BottomControls, TopControls } from "@/components/ModeControls";
 import Terminal from "@/components/Terminal";
 import { useTypingSession } from "@/store";
@@ -41,6 +42,9 @@ export default function HomePage() {
           }
         />
       </div>
+
+      {/* Dedicated Analytics & Weakness Engine Modal */}
+      <AnalyticsDashboard />
     </main>
   );
 }

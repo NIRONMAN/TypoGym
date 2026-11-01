@@ -32,7 +32,7 @@ export const ALPHABET = [
 export type Letter = (typeof ALPHABET)[number];
 
 export type PracticeMode = "normal" | "targeted";
-export type TargetType = "letter" | "finger";
+export type TargetType = "letter" | "finger" | "cluster" | "adaptive";
 
 export type FingerId =
   | "left-pinky"
@@ -54,6 +54,7 @@ export interface SessionConfig {
   };
   targetType?: TargetType;
   targetId?: string;
+  targetLetters?: Letter[];
 }
 
 export interface SessionResult {
@@ -68,6 +69,7 @@ export interface SessionResult {
     mode: PracticeMode;
     targetType?: TargetType;
     targetId?: string;
+    targetLetters?: Letter[];
   };
 }
 
@@ -98,6 +100,40 @@ export interface WeakLetter {
   letter: Letter;
   score: number;
   stat: LetterStat;
+}
+
+export type MasteryTier = "novice" | "apprentice" | "proficient" | "master";
+export type DecayStatus = "fresh" | "needs-review" | "rusty";
+
+export interface LetterMasteryInfo {
+  letter: Letter;
+  tier: MasteryTier;
+  decayStatus: DecayStatus;
+  daysSinceLastSeen: number | null;
+  score: number;
+  stat: LetterStat;
+}
+
+export interface StreakInfo {
+  currentStreak: number;
+  longestStreak: number;
+  lastPracticedDate: string | null;
+}
+
+export interface CalendarDay {
+  date: string;
+  count: number;
+  charsTyped: number;
+  level: 0 | 1 | 2 | 3 | 4;
+}
+
+export interface SessionDelta {
+  wpmDelta: number;
+  accuracyDelta: number;
+  targetLetterStats?: {
+    letter: Letter;
+    currentAcc: number;
+  };
 }
 
 export const FINGER_MAP: Record<FingerId, Letter[]> = {
@@ -296,14 +332,39 @@ export function generateNormalPrompt(config: SessionConfig): string {
   return generatePromptFromLetterPlan(letterPlan, config.corpusMix);
 }
 
-function letterSetFromConfig(config: SessionConfig): Letter[] {
-  if (config.targetType === "letter" && config.targetId && isLetter(config.targetId)) {
-    return [config.targetId];
+function letterSetFromConfig(
+  config: SessionConfig,
+  letterStats?: Record<Letter, LetterStat>,
+): Letter[] {
+  if (config.targetType === "cluster" && config.targetLetters && config.targetLetters.length > 0) {
+    return config.targetLetters;
+  }
+
+  if (config.targetType === "adaptive") {
+    if (letterStats) {
+      const adaptive = getAdaptiveWorkoutLetters(letterStats);
+      return adaptive.targetLetters;
+    }
+    return config.targetLetters && config.targetLetters.length > 0 ? config.targetLetters : ["q", "x", "z"];
+  }
+
+  if (config.targetType === "letter") {
+    if (config.targetLetters && config.targetLetters.length > 0) {
+      return [config.targetLetters[0]];
+    }
+    if (config.targetId && isLetter(config.targetId)) {
+      return [config.targetId];
+    }
+    return ["a"];
   }
 
   if (config.targetType === "finger" && config.targetId && config.targetId in FINGER_MAP) {
     const fingerLetters = FINGER_MAP[config.targetId as FingerId];
     return fingerLetters.length > 0 ? fingerLetters : [...ALPHABET];
+  }
+
+  if (config.targetLetters && config.targetLetters.length > 0) {
+    return config.targetLetters;
   }
 
   return [...ALPHABET];
@@ -341,8 +402,9 @@ function buildTargetedLetterPlan(
 export function generateTargetedPrompt(
   config: SessionConfig,
   weakLetters: Letter[],
+  letterStats?: Record<Letter, LetterStat>,
 ): string {
-  const targetLetters = letterSetFromConfig(config);
+  const targetLetters = letterSetFromConfig(config, letterStats);
   const wordCount = estimateWordCount(config.durationSec);
   const letterPlan = buildTargetedLetterPlan(wordCount, targetLetters, weakLetters);
   return generatePromptFromLetterPlan(letterPlan, config.corpusMix);
@@ -464,4 +526,248 @@ export function pickWeakLettersForPrompt(letterStats: Record<Letter, LetterStat>
   return rankWeakLetters(letterStats, limit)
     .filter((item) => item.score > 0)
     .map((item) => item.letter);
+}
+
+export function getLetterMastery(stat: LetterStat, now = Date.now()): LetterMasteryInfo {
+  const daysSinceLastSeen =
+    stat.lastSeenAt !== null
+      ? Math.max(0, Math.floor((now - stat.lastSeenAt) / (1000 * 60 * 60 * 24)))
+      : null;
+
+  let decayStatus: DecayStatus = "fresh";
+  if (daysSinceLastSeen !== null && stat.attempts >= 5) {
+    if (daysSinceLastSeen >= 14) {
+      decayStatus = "rusty";
+    } else if (daysSinceLastSeen >= 7) {
+      decayStatus = "needs-review";
+    }
+  }
+
+  let tier: MasteryTier = "novice";
+  if (stat.attempts >= 15 && stat.accuracy >= 95) {
+    tier = "master";
+  } else if (stat.attempts >= 10 && stat.accuracy >= 88) {
+    tier = "proficient";
+  } else if (stat.attempts >= 5 && stat.accuracy >= 75) {
+    tier = "apprentice";
+  } else {
+    tier = "novice";
+  }
+
+  return {
+    letter: stat.letter,
+    tier,
+    decayStatus,
+    daysSinceLastSeen,
+    score: roundTwo(weakScore(stat)),
+    stat,
+  };
+}
+
+export function calculateStreak(sessionHistory: SessionResult[], now = Date.now()): StreakInfo {
+  if (sessionHistory.length === 0) {
+    return { currentStreak: 0, longestStreak: 0, lastPracticedDate: null };
+  }
+
+  const dateSet = new Set<string>();
+  sessionHistory.forEach((s) => {
+    const d = new Date(s.endedAt);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    dateSet.add(dateStr);
+  });
+
+  const uniqueDays = Array.from(dateSet).sort().reverse();
+  if (uniqueDays.length === 0) {
+    return { currentStreak: 0, longestStreak: 0, lastPracticedDate: null };
+  }
+
+  const nowDate = new Date(now);
+  const todayStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}-${String(nowDate.getDate()).padStart(2, "0")}`;
+
+  const yesterday = new Date(now - 24 * 60 * 60 * 1000);
+  const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+
+  const lastPracticed = uniqueDays[0];
+  let currentStreak = 0;
+
+  if (lastPracticed === todayStr || lastPracticed === yesterdayStr) {
+    let checkDate = new Date(lastPracticed === todayStr ? now : yesterday.getTime());
+    while (true) {
+      const checkStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, "0")}-${String(checkDate.getDate()).padStart(2, "0")}`;
+      if (dateSet.has(checkStr)) {
+        currentStreak += 1;
+        checkDate = new Date(checkDate.getTime() - 24 * 60 * 60 * 1000);
+      } else {
+        break;
+      }
+    }
+  }
+
+  let longestStreak = 0;
+  let running = 0;
+  const sortedAsc = Array.from(dateSet).sort();
+  for (let i = 0; i < sortedAsc.length; i++) {
+    if (i === 0) {
+      running = 1;
+    } else {
+      const prev = new Date(sortedAsc[i - 1]).getTime();
+      const curr = new Date(sortedAsc[i]).getTime();
+      const diffDays = Math.round((curr - prev) / (24 * 60 * 60 * 1000));
+      if (diffDays === 1) {
+        running += 1;
+      } else if (diffDays > 1) {
+        running = 1;
+      }
+    }
+    if (running > longestStreak) {
+      longestStreak = running;
+    }
+  }
+
+  return {
+    currentStreak,
+    longestStreak: Math.max(longestStreak, currentStreak),
+    lastPracticedDate: lastPracticed,
+  };
+}
+
+export function buildConsistencyCalendar(
+  sessionHistory: SessionResult[],
+  weeks = 12,
+  now = Date.now(),
+): CalendarDay[] {
+  const totalDays = weeks * 7;
+  const daysMap = new Map<string, { count: number; charsTyped: number }>();
+
+  sessionHistory.forEach((s) => {
+    const d = new Date(s.endedAt);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const existing = daysMap.get(dateStr) ?? { count: 0, charsTyped: 0 };
+    daysMap.set(dateStr, {
+      count: existing.count + 1,
+      charsTyped: existing.charsTyped + (s.charsTyped || 0),
+    });
+  });
+
+  const result: CalendarDay[] = [];
+  const nowDate = new Date(now);
+  const dayOfWeek = nowDate.getDay();
+  const endOffsetDays = 6 - dayOfWeek;
+  const endDate = new Date(nowDate.getTime() + endOffsetDays * 24 * 60 * 60 * 1000);
+
+  for (let i = totalDays - 1; i >= 0; i--) {
+    const d = new Date(endDate.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const data = daysMap.get(dateStr) ?? { count: 0, charsTyped: 0 };
+    let level: 0 | 1 | 2 | 3 | 4 = 0;
+    if (data.count >= 6) level = 4;
+    else if (data.count >= 4) level = 3;
+    else if (data.count >= 2) level = 2;
+    else if (data.count >= 1) level = 1;
+
+    result.push({
+      date: dateStr,
+      count: data.count,
+      charsTyped: data.charsTyped,
+      level,
+    });
+  }
+
+  return result;
+}
+
+export function getAdaptiveWorkoutLetters(
+  letterStats: Record<Letter, LetterStat>,
+  now = Date.now(),
+): {
+  targetLetters: Letter[];
+  weakLetters: Letter[];
+  reviewLetters: Letter[];
+  confidentLetters: Letter[];
+} {
+  const allMastery = ALPHABET.map((letter) => getLetterMastery(letterStats[letter], now));
+
+  const sortedWeak = [...allMastery]
+    .filter((m) => m.score > 0 || (m.stat.attempts > 0 && m.stat.accuracy < 85))
+    .sort((a, b) => b.score - a.score || a.stat.accuracy - b.stat.accuracy);
+
+  const weakLetters = sortedWeak.slice(0, 3).map((m) => m.letter);
+
+  const reviewCandidates = allMastery.filter(
+    (m) =>
+      !weakLetters.includes(m.letter) &&
+      (m.decayStatus === "needs-review" ||
+        m.decayStatus === "rusty" ||
+        (m.stat.attempts > 0 && (m.daysSinceLastSeen ?? 0) >= 7)),
+  );
+  const reviewLetters = reviewCandidates.slice(0, 2).map((m) => m.letter);
+
+  const confidentCandidates = allMastery.filter(
+    (m) =>
+      !weakLetters.includes(m.letter) &&
+      !reviewLetters.includes(m.letter) &&
+      (m.tier === "master" || m.tier === "proficient" || m.stat.accuracy >= 90),
+  );
+  const confidentLetters = confidentCandidates.slice(0, 2).map((m) => m.letter);
+
+  const fallbackLetters = ALPHABET.filter(
+    (l) => !weakLetters.includes(l) && !reviewLetters.includes(l) && !confidentLetters.includes(l),
+  );
+
+  const targetLetters = Array.from(
+    new Set([
+      ...(weakLetters.length > 0 ? weakLetters : fallbackLetters.slice(0, 2)),
+      ...(reviewLetters.length > 0 ? reviewLetters : fallbackLetters.slice(2, 4)),
+      ...(confidentLetters.length > 0 ? confidentLetters : fallbackLetters.slice(4, 5)),
+    ]),
+  );
+
+  return {
+    targetLetters,
+    weakLetters,
+    reviewLetters,
+    confidentLetters,
+  };
+}
+
+export function calculateSessionDelta(
+  lastResult: SessionResult,
+  sessionHistory: SessionResult[],
+  letterStats: Record<Letter, LetterStat>,
+): SessionDelta {
+  const previousSessions = sessionHistory
+    .filter((s) => s.startedAt !== lastResult.startedAt)
+    .slice(-7);
+
+  const avgPrevWpm =
+    previousSessions.length > 0
+      ? previousSessions.reduce((sum, s) => sum + s.netWpm, 0) / previousSessions.length
+      : lastResult.netWpm;
+  const avgPrevAcc =
+    previousSessions.length > 0
+      ? previousSessions.reduce((sum, s) => sum + s.accuracy, 0) / previousSessions.length
+      : lastResult.accuracy;
+
+  const wpmDelta = roundTwo(lastResult.netWpm - avgPrevWpm);
+  const accuracyDelta = roundTwo(lastResult.accuracy - avgPrevAcc);
+
+  let targetLetterStats: SessionDelta["targetLetterStats"] | undefined;
+  const targetCandidate =
+    lastResult.modeMeta.targetId && isLetter(lastResult.modeMeta.targetId)
+      ? (lastResult.modeMeta.targetId as Letter)
+      : lastResult.modeMeta.targetLetters?.[0];
+
+  if (targetCandidate && letterStats[targetCandidate]) {
+    const stat = letterStats[targetCandidate];
+    targetLetterStats = {
+      letter: targetCandidate,
+      currentAcc: stat.accuracy,
+    };
+  }
+
+  return {
+    wpmDelta,
+    accuracyDelta,
+    targetLetterStats,
+  };
 }

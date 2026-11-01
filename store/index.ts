@@ -1,20 +1,29 @@
 import { create } from "zustand";
 import {
   ALPHABET,
+  buildConsistencyCalendar,
   buildProgressSummary,
   calculateMetrics,
+  calculateSessionDelta,
+  calculateStreak,
+  CalendarDay,
   createDefaultLetterStats,
   FINGER_MAP,
   generateNormalPrompt,
   generateTargetedPrompt,
+  getAdaptiveWorkoutLetters,
+  getLetterMastery,
   Letter,
+  LetterMasteryInfo,
   LetterStat,
   pickWeakLettersForPrompt,
   PracticeMode,
   ProgressSummary,
   rankWeakLetters,
   SessionConfig,
+  SessionDelta,
   SessionResult,
+  StreakInfo,
   TargetType,
   updateLetterStat,
   WeakLetter,
@@ -45,11 +54,23 @@ interface TypingEngineState {
   sessionHistory: SessionResult[];
   letterStats: Record<Letter, LetterStat>;
   lastResult: SessionResult | null;
+  isAnalyticsOpen: boolean;
+
+  openAnalytics: () => void;
+  closeAnalytics: () => void;
+  toggleAnalytics: () => void;
 
   setMode: (mode: PracticeMode) => void;
   setDuration: (durationSec: number) => void;
   setTargetType: (targetType: TargetType) => void;
   setTargetId: (targetId: string) => void;
+  setTargetLetters: (letters: Letter[]) => void;
+  startTargetedDrill: (params: {
+    targetType: TargetType;
+    targetId?: string;
+    targetLetters?: Letter[];
+    durationSec?: number;
+  }) => void;
 
   initPrompt: () => void;
   resetSession: () => void;
@@ -62,6 +83,11 @@ interface TypingEngineState {
 
   getWeakLetters: (limit: number) => WeakLetter[];
   getProgressSummary: (window: number) => ProgressSummary;
+  getStreak: () => StreakInfo;
+  getCalendar: (weeks?: number) => CalendarDay[];
+  getMastery: () => LetterMasteryInfo[];
+  getAdaptiveLetters: () => ReturnType<typeof getAdaptiveWorkoutLetters>;
+  getLastResultDelta: () => SessionDelta | null;
 }
 
 const DEFAULT_CONFIG: SessionConfig = {
@@ -104,7 +130,7 @@ function readProgress(): PersistedProgress | null {
 function buildPrompt(config: SessionConfig, letterStats: Record<Letter, LetterStat>): string {
   if (config.mode === "targeted") {
     const weakLetters = pickWeakLettersForPrompt(letterStats);
-    return generateTargetedPrompt(config, weakLetters);
+    return generateTargetedPrompt(config, weakLetters, letterStats);
   }
 
   return generateNormalPrompt(config);
@@ -129,6 +155,11 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
   sessionHistory: [],
   letterStats: createDefaultLetterStats(),
   lastResult: null,
+  isAnalyticsOpen: false,
+
+  openAnalytics: () => set({ isAnalyticsOpen: true }),
+  closeAnalytics: () => set({ isAnalyticsOpen: false }),
+  toggleAnalytics: () => set((state) => ({ isAnalyticsOpen: !state.isAnalyticsOpen })),
 
   setMode: (mode) =>
     set((state) => {
@@ -216,6 +247,53 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
         currentError: state.status === "idle" ? false : state.currentError,
       };
     }),
+
+  setTargetLetters: (targetLetters) =>
+    set((state) => {
+      const nextConfig: SessionConfig = {
+        ...state.config,
+        targetLetters,
+      };
+      const nextPrompt =
+        state.status === "idle"
+          ? buildPrompt(nextConfig, state.letterStats)
+          : state.prompt;
+
+      return {
+        config: nextConfig,
+        prompt: nextPrompt,
+        cursorIndex: state.status === "idle" ? 0 : state.cursorIndex,
+        currentError: state.status === "idle" ? false : state.currentError,
+      };
+    }),
+
+  startTargetedDrill: (params) => {
+    const state = get();
+    const nextConfig: SessionConfig = {
+      ...state.config,
+      mode: "targeted",
+      targetType: params.targetType,
+      targetId: params.targetId,
+      targetLetters: params.targetLetters,
+      durationSec: params.durationSec ?? state.config.durationSec,
+    };
+    const prompt = buildPrompt(nextConfig, state.letterStats);
+    set({
+      config: nextConfig,
+      prompt,
+      cursorIndex: 0,
+      currentError: false,
+      remainingSec: nextConfig.durationSec,
+      sessionStartedAt: null,
+      sessionEndsAt: null,
+      charFocusStartedAt: null,
+      correctChars: 0,
+      errors: 0,
+      lastResult: null,
+      status: "idle",
+      isAnalyticsOpen: false,
+    });
+  },
 
   initPrompt: () => {
     const state = get();
@@ -324,6 +402,7 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
         mode: state.config.mode,
         targetType: state.config.targetType,
         targetId: state.config.targetId,
+        targetLetters: state.config.targetLetters,
       },
     };
 
@@ -475,6 +554,20 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
   getWeakLetters: (limit) => rankWeakLetters(get().letterStats, limit),
 
   getProgressSummary: (window) => buildProgressSummary(get().sessionHistory, window),
+
+  getStreak: () => calculateStreak(get().sessionHistory),
+
+  getCalendar: (weeks = 12) => buildConsistencyCalendar(get().sessionHistory, weeks),
+
+  getMastery: () => ALPHABET.map((letter) => getLetterMastery(get().letterStats[letter])),
+
+  getAdaptiveLetters: () => getAdaptiveWorkoutLetters(get().letterStats),
+
+  getLastResultDelta: () => {
+    const state = get();
+    if (!state.lastResult) return null;
+    return calculateSessionDelta(state.lastResult, state.sessionHistory, state.letterStats);
+  },
 }));
 
 export { FINGER_MAP };

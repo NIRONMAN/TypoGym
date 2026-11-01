@@ -72,6 +72,7 @@ export default function Terminal({ externalTab, onTabChange }: TerminalProps) {
   const endSession = useTypingSession((state) => state.endSession);
   const handleKeystroke = useTypingSession((state) => state.handleKeystroke);
   const tick = useTypingSession((state) => state.tick);
+  const openAnalytics = useTypingSession((state) => state.openAnalytics);
 
   const [activeTab, setActiveTabState] = useState<"arena" | "telemetry">("arena");
   const [windowStartLine, setWindowStartLine] = useState(0);
@@ -121,11 +122,15 @@ export default function Terminal({ externalTab, onTabChange }: TerminalProps) {
         return;
       }
 
-      // Tab: quick restart
+      // Tab: open full analytics if ended, else quick restart
       if (event.key === "Tab") {
         event.preventDefault();
-        restartSession();
-        setTab("arena");
+        if (status === "ended") {
+          openAnalytics();
+        } else {
+          restartSession();
+          setTab("arena");
+        }
         return;
       }
 
@@ -173,7 +178,7 @@ export default function Terminal({ externalTab, onTabChange }: TerminalProps) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [status, startSession, restartSession, endSession, handleKeystroke, setTab]);
+  }, [status, startSession, restartSession, endSession, handleKeystroke, setTab, openAnalytics]);
 
   // Split prompt lines
   const promptLines = useMemo(() => splitPromptIntoLines(prompt, CHARS_PER_LINE), [prompt]);

@@ -5,11 +5,16 @@ import words from "../public/words.json" with { type: "json" };
 import artificialWords from "../public/artificialWords.json" with { type: "json" };
 import {
   ALPHABET,
+  buildConsistencyCalendar,
   buildProgressSummary,
   calculateMetrics,
+  calculateSessionDelta,
+  calculateStreak,
   createDefaultLetterStats,
   generateNormalPrompt,
   generateTargetedPrompt,
+  getAdaptiveWorkoutLetters,
+  getLetterMastery,
   rankWeakLetters,
   updateLetterStat,
 } from "../lib/typingEngine.ts";
@@ -138,4 +143,115 @@ test("buildProgressSummary computes 7-window deltas", () => {
   assert.equal(summary.totalSessions, 14);
   assert.ok(summary.netWpmDelta > 0);
   assert.ok(summary.accuracyDelta > 0);
+});
+
+test("getLetterMastery categorizes tiers and handles decay", () => {
+  const stats = createDefaultLetterStats();
+  const now = Date.now();
+
+  // Novice (< 5 attempts)
+  const noviceMastery = getLetterMastery(stats.a, now);
+  assert.equal(noviceMastery.tier, "novice");
+  assert.equal(noviceMastery.decayStatus, "fresh");
+
+  // Master: 20 attempts, 0 errors, recent practice
+  let masterStat = stats.b;
+  for (let i = 0; i < 20; i++) {
+    masterStat = updateLetterStat(masterStat, { now: now - 1000, isError: false });
+  }
+  const masterInfo = getLetterMastery(masterStat, now);
+  assert.equal(masterInfo.tier, "master");
+  assert.equal(masterInfo.decayStatus, "fresh");
+
+  // Decay: practiced 10 days ago -> needs-review
+  const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000;
+  const decayStat = { ...masterStat, lastSeenAt: tenDaysAgo };
+  const decayInfo = getLetterMastery(decayStat, now);
+  assert.equal(decayInfo.decayStatus, "needs-review");
+
+  // Rusty: practiced 20 days ago -> rusty
+  const twentyDaysAgo = now - 20 * 24 * 60 * 60 * 1000;
+  const rustyStat = { ...masterStat, lastSeenAt: twentyDaysAgo };
+  const rustyInfo = getLetterMastery(rustyStat, now);
+  assert.equal(rustyInfo.decayStatus, "rusty");
+});
+
+test("calculateStreak computes consecutive practice days", () => {
+  const now = new Date("2026-11-01T12:00:00Z").getTime();
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  // 3 consecutive days ending today
+  const history = [
+    { endedAt: now - 2 * oneDay, startedAt: now - 2 * oneDay - 60000, netWpm: 60, grossWpm: 60, accuracy: 95, charsTyped: 100, errors: 2, modeMeta: { mode: "normal" as const } },
+    { endedAt: now - oneDay, startedAt: now - oneDay - 60000, netWpm: 65, grossWpm: 65, accuracy: 96, charsTyped: 100, errors: 1, modeMeta: { mode: "normal" as const } },
+    { endedAt: now, startedAt: now - 60000, netWpm: 70, grossWpm: 70, accuracy: 98, charsTyped: 100, errors: 0, modeMeta: { mode: "normal" as const } },
+  ];
+
+  const streak = calculateStreak(history, now);
+  assert.equal(streak.currentStreak, 3);
+  assert.equal(streak.longestStreak, 3);
+});
+
+test("buildConsistencyCalendar generates 12 weeks of data", () => {
+  const now = new Date("2026-11-01T12:00:00Z").getTime();
+  const history = [
+    { endedAt: now, startedAt: now - 60000, netWpm: 60, grossWpm: 60, accuracy: 95, charsTyped: 150, errors: 2, modeMeta: { mode: "normal" as const } },
+  ];
+
+  const calendar = buildConsistencyCalendar(history, 12, now);
+  assert.equal(calendar.length, 84);
+  const activeDays = calendar.filter((d) => d.count > 0);
+  assert.equal(activeDays.length, 1);
+  assert.equal(activeDays[0].charsTyped, 150);
+});
+
+test("getAdaptiveWorkoutLetters provides balanced practice mix", () => {
+  const stats = createDefaultLetterStats();
+  const now = Date.now();
+
+  // Create a weak letter
+  stats.q = updateLetterStat(stats.q, { now, isError: true });
+  stats.q = updateLetterStat(stats.q, { now, isError: true });
+
+  const adaptive = getAdaptiveWorkoutLetters(stats, now);
+  assert.ok(adaptive.targetLetters.length >= 3);
+  assert.ok(adaptive.targetLetters.includes("q"));
+});
+
+test("calculateSessionDelta computes delta against rolling window", () => {
+  const history = [
+    { endedAt: 1000, startedAt: 0, netWpm: 50, grossWpm: 50, accuracy: 90, charsTyped: 100, errors: 5, modeMeta: { mode: "normal" as const } },
+  ];
+  const lastResult = {
+    endedAt: 2000,
+    startedAt: 1001,
+    netWpm: 65,
+    grossWpm: 65,
+    accuracy: 95,
+    charsTyped: 120,
+    errors: 2,
+    modeMeta: { mode: "targeted" as const, targetId: "x" },
+  };
+  const stats = createDefaultLetterStats();
+
+  const delta = calculateSessionDelta(lastResult, [...history, lastResult], stats);
+  assert.equal(delta.wpmDelta, 15);
+  assert.equal(delta.accuracyDelta, 5);
+  assert.equal(delta.targetLetterStats?.letter, "x");
+});
+
+test("generateTargetedPrompt supports cluster targetType", () => {
+  const config: SessionConfig = {
+    mode: "targeted",
+    durationSec: 30,
+    corpusMix: { real: 1.0, artificial: 0.0 },
+    targetType: "cluster",
+    targetLetters: ["z", "q", "x"],
+  };
+
+  const prompt = generateTargetedPrompt(config, ["z"]);
+  const words = prompt.split(" ");
+  assert.ok(words.length >= 15);
+  const hasClusterLetters = words.some((w) => w.includes("z") || w.includes("q") || w.includes("x"));
+  assert.ok(hasClusterLetters);
 });
