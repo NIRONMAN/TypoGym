@@ -1,110 +1,132 @@
 "use client";
 
 import { useMemo } from "react";
-import { ALPHABET } from "@/lib/typingEngine";
-import { buildProgressSummary, rankWeakLetters } from "@/lib/typingEngine";
+import { ALPHABET, buildProgressSummary, Letter, rankWeakLetters } from "@/lib/typingEngine";
 import { useTypingSession } from "@/store";
 
-type AnalyticsProps = {
-  side: "left" | "right";
-};
-
-function formatDelta(value: number): string {
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toFixed(2)}`;
+interface AnalyticsProps {
+  onRestart?: () => void;
+  onSelectTargetLetter?: (letter: Letter) => void;
 }
 
-function Analytics({ side }: AnalyticsProps) {
+export default function Analytics({ onRestart, onSelectTargetLetter }: AnalyticsProps) {
   const sessionHistory = useTypingSession((state) => state.sessionHistory);
   const lastResult = useTypingSession((state) => state.lastResult);
   const letterStats = useTypingSession((state) => state.letterStats);
+  const setMode = useTypingSession((state) => state.setMode);
+  const setTargetType = useTypingSession((state) => state.setTargetType);
+  const setTargetId = useTypingSession((state) => state.setTargetId);
+  const restartSession = useTypingSession((state) => state.restartSession);
+
   const summary = useMemo(() => buildProgressSummary(sessionHistory, 7), [sessionHistory]);
-  const weakLetters = useMemo(() => rankWeakLetters(letterStats, 8), [letterStats]);
+  const weakLetters = useMemo(() => rankWeakLetters(letterStats, 5), [letterStats]);
 
-  if (side === "left") {
-    return (
-      <section className="flex h-full flex-col gap-3 rounded-xl border border-slate-800 bg-[#0f1117] p-3 text-slate-100">
-        <div className="grid gap-2">
-          <Metric label="Last Net WPM" value={lastResult ? String(lastResult.netWpm) : "-"} />
-          <Metric label="Last Accuracy" value={lastResult ? `${lastResult.accuracy}%` : "-"} />
-          <Metric label="Avg Net WPM" value={String(summary.avgNetWpm)} />
-          <Metric label="Sessions" value={String(summary.totalSessions)} />
-        </div>
-
-        <div className="rounded border border-slate-700 bg-slate-950/40 p-3">
-          <div className="font-mono text-xs text-slate-400">7-SESSION TREND</div>
-          <div className="mt-2 font-mono text-sm text-slate-200">
-            Net WPM Delta:{" "}
-            <span className={summary.netWpmDelta >= 0 ? "text-emerald-300" : "text-red-300"}>
-              {formatDelta(summary.netWpmDelta)}
-            </span>
-          </div>
-          <div className="font-mono text-sm text-slate-200">
-            Accuracy Delta:{" "}
-            <span className={summary.accuracyDelta >= 0 ? "text-emerald-300" : "text-red-300"}>
-              {formatDelta(summary.accuracyDelta)}%
-            </span>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  const handlePracticeLetter = (letter: Letter) => {
+    setMode("targeted");
+    setTargetType("letter");
+    setTargetId(letter);
+    if (onSelectTargetLetter) {
+      onSelectTargetLetter(letter);
+    }
+    restartSession();
+    if (onRestart) {
+      onRestart();
+    }
+  };
 
   return (
-    <section className="flex h-full flex-col gap-3 rounded-xl border border-slate-800 bg-[#0f1117] p-3 text-slate-100">
-      <div className="rounded border border-slate-700 bg-slate-950/40 p-3">
-        <div className="font-mono text-xs text-slate-400">WEAK LETTERS</div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {weakLetters.length > 0 ? (
-            weakLetters.map((item) => (
-              <span
-                key={item.letter}
-                className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1 font-mono text-xs text-red-200"
-              >
-                {item.letter.toUpperCase()} • {item.stat.accuracy.toFixed(1)}%
-              </span>
-            ))
-          ) : (
-            <span className="font-mono text-xs text-slate-500">
-              No weak letters yet. Complete a few sessions.
-            </span>
-          )}
+    <div className="flex flex-col gap-6 font-mono text-zinc-300">
+      {/* Primary Result Headline */}
+      {lastResult ? (
+        <div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-zinc-800/80 pb-4">
+          <div className="flex items-baseline gap-6">
+            <div>
+              <span className="text-3xl font-bold text-emerald-400">{lastResult.netWpm}</span>
+              <span className="ml-1 text-xs text-zinc-500">wpm</span>
+            </div>
+            <div>
+              <span className="text-3xl font-bold text-zinc-200">{lastResult.accuracy}%</span>
+              <span className="ml-1 text-xs text-zinc-500">acc</span>
+            </div>
+            <div>
+              <span className="text-xl font-medium text-zinc-400">{lastResult.errors}</span>
+              <span className="ml-1 text-xs text-zinc-500">err</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              restartSession();
+              if (onRestart) onRestart();
+            }}
+            className="rounded border border-zinc-700 bg-zinc-800/80 px-3 py-1.5 text-xs text-emerald-400 transition hover:bg-zinc-700 hover:text-white"
+          >
+            next session ↵
+          </button>
+        </div>
+      ) : null}
+
+      {/* 7-Session Trend & Weak Keys */}
+      <div className="grid gap-4 sm:grid-cols-2 text-xs text-zinc-400">
+        <div>
+          <div className="text-zinc-500 mb-1">7-session average</div>
+          <div className="text-sm text-zinc-300">
+            {summary.avgNetWpm} wpm • {summary.avgAccuracy}% acc ({summary.totalSessions} sessions)
+          </div>
+        </div>
+
+        <div>
+          <div className="text-zinc-500 mb-1">focus keys</div>
+          <div className="flex flex-wrap gap-1.5">
+            {weakLetters.length > 0 ? (
+              weakLetters.map((item) => (
+                <button
+                  key={item.letter}
+                  type="button"
+                  onClick={() => handlePracticeLetter(item.letter)}
+                  className="rounded bg-zinc-800/60 px-2 py-0.5 text-zinc-300 hover:bg-zinc-700 hover:text-emerald-400"
+                >
+                  {item.letter.toUpperCase()} ({item.stat.accuracy.toFixed(0)}%)
+                </button>
+              ))
+            ) : (
+              <span className="text-zinc-600">no weak keys calibrated</span>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="rounded border border-slate-700 bg-slate-950/40 p-3">
-        <div className="mb-2 font-mono text-xs text-slate-400">LETTER HEAT STRIP</div>
-        <div className="grid grid-cols-6 gap-1">
+      {/* 26-Letter Heatmap */}
+      <div className="border-t border-zinc-800/60 pt-3">
+        <div className="text-[11px] text-zinc-500 mb-2">alphabet calibration</div>
+        <div className="grid grid-cols-13 gap-1 max-[640px]:grid-cols-7 text-xs">
           {ALPHABET.map((letter) => {
             const stat = letterStats[letter];
-            const errorRate = stat.attempts === 0 ? 0 : stat.errors / stat.attempts;
-            const intensity = Math.min(1, errorRate * 2 + stat.streakError * 0.1);
-            const bg = `rgba(239, 68, 68, ${0.1 + intensity * 0.55})`;
+            const hasData = stat.attempts > 0;
+            const accuracy = stat.accuracy;
+
+            let color = "text-zinc-600";
+            if (hasData) {
+              if (accuracy >= 95) color = "text-emerald-400";
+              else if (accuracy >= 85) color = "text-amber-400";
+              else color = "text-rose-400 font-bold";
+            }
 
             return (
-              <div
+              <button
                 key={letter}
-                className="rounded border border-slate-700 px-1 py-1 text-center font-mono text-xs"
-                style={{ background: bg }}
-                title={`${letter.toUpperCase()} | attempts: ${stat.attempts}, errors: ${stat.errors}, accuracy: ${stat.accuracy}%`}
+                type="button"
+                onClick={() => handlePracticeLetter(letter)}
+                className={`py-1 text-center transition hover:bg-zinc-800/50 rounded ${color}`}
+                title={`${letter.toUpperCase()} (${hasData ? `${accuracy}%` : "untested"})`}
               >
                 {letter.toUpperCase()}
-              </div>
+              </button>
             );
           })}
         </div>
       </div>
-    </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded border border-slate-700 bg-slate-950/40 p-3">
-      <div className="font-mono text-xs text-slate-400">{label}</div>
-      <div className="mt-1 font-mono text-base text-slate-100">{value}</div>
     </div>
   );
 }
-
-export default Analytics;

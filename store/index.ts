@@ -51,6 +51,8 @@ interface TypingEngineState {
   setTargetType: (targetType: TargetType) => void;
   setTargetId: (targetId: string) => void;
 
+  initPrompt: () => void;
+  resetSession: () => void;
   hydrateProgress: () => void;
   startSession: (configOverride?: Partial<SessionConfig>) => void;
   restartSession: () => void;
@@ -136,62 +138,134 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
           ? state.config.targetId ?? (targetType === "finger" ? "left-index" : "a")
           : undefined;
 
+      const nextConfig: SessionConfig = {
+        ...state.config,
+        mode,
+        targetType,
+        targetId,
+      };
+
+      const nextPrompt =
+        state.status === "idle"
+          ? buildPrompt(nextConfig, state.letterStats)
+          : state.prompt;
+
       return {
-        config: {
-          ...state.config,
-          mode,
-          targetType,
-          targetId,
-        },
+        config: nextConfig,
+        prompt: nextPrompt,
+        cursorIndex: state.status === "idle" ? 0 : state.cursorIndex,
+        currentError: state.status === "idle" ? false : state.currentError,
       };
     }),
 
   setDuration: (durationSec) =>
-    set((state) => ({
-      config: {
+    set((state) => {
+      const nextConfig: SessionConfig = {
         ...state.config,
         durationSec,
-      },
-      remainingSec: state.status === "running" ? state.remainingSec : durationSec,
-    })),
+      };
+      const nextPrompt =
+        state.status === "idle"
+          ? buildPrompt(nextConfig, state.letterStats)
+          : state.prompt;
+
+      return {
+        config: nextConfig,
+        remainingSec: state.status === "running" ? state.remainingSec : durationSec,
+        prompt: nextPrompt,
+        cursorIndex: state.status === "idle" ? 0 : state.cursorIndex,
+        currentError: state.status === "idle" ? false : state.currentError,
+      };
+    }),
 
   setTargetType: (targetType) =>
-    set((state) => ({
-      config: {
+    set((state) => {
+      const nextConfig: SessionConfig = {
         ...state.config,
         targetType,
         targetId: targetType === "finger" ? "left-index" : "a",
-      },
-    })),
+      };
+      const nextPrompt =
+        state.status === "idle"
+          ? buildPrompt(nextConfig, state.letterStats)
+          : state.prompt;
+
+      return {
+        config: nextConfig,
+        prompt: nextPrompt,
+        cursorIndex: state.status === "idle" ? 0 : state.cursorIndex,
+        currentError: state.status === "idle" ? false : state.currentError,
+      };
+    }),
 
   setTargetId: (targetId) =>
-    set((state) => ({
-      config: {
+    set((state) => {
+      const nextConfig: SessionConfig = {
         ...state.config,
         targetId,
-      },
-    })),
+      };
+      const nextPrompt =
+        state.status === "idle"
+          ? buildPrompt(nextConfig, state.letterStats)
+          : state.prompt;
+
+      return {
+        config: nextConfig,
+        prompt: nextPrompt,
+        cursorIndex: state.status === "idle" ? 0 : state.cursorIndex,
+        currentError: state.status === "idle" ? false : state.currentError,
+      };
+    }),
+
+  initPrompt: () => {
+    const state = get();
+    if (!state.prompt || state.status === "idle") {
+      const prompt = buildPrompt(state.config, state.letterStats);
+      set({ prompt, cursorIndex: 0, currentError: false });
+    }
+  },
+
+  resetSession: () => {
+    const state = get();
+    const prompt = buildPrompt(state.config, state.letterStats);
+    set({
+      status: "idle",
+      prompt,
+      cursorIndex: 0,
+      currentError: false,
+      remainingSec: state.config.durationSec,
+      sessionStartedAt: null,
+      sessionEndsAt: null,
+      charFocusStartedAt: null,
+      correctChars: 0,
+      errors: 0,
+      lastResult: null,
+    });
+  },
 
   hydrateProgress: () => {
     const persisted = readProgress();
-    if (!persisted) {
-      return;
-    }
-
     const fallbackStats = createDefaultLetterStats();
     const mergedStats = { ...fallbackStats };
-    ALPHABET.forEach((letter) => {
-      if (persisted.letterStats[letter]) {
-        mergedStats[letter] = {
-          ...fallbackStats[letter],
-          ...persisted.letterStats[letter],
-        };
-      }
-    });
+
+    if (persisted) {
+      ALPHABET.forEach((letter) => {
+        if (persisted.letterStats[letter]) {
+          mergedStats[letter] = {
+            ...fallbackStats[letter],
+            ...persisted.letterStats[letter],
+          };
+        }
+      });
+    }
+
+    const currentState = get();
+    const prompt = currentState.prompt || buildPrompt(currentState.config, mergedStats);
 
     set({
-      sessionHistory: persisted.sessionHistory,
+      sessionHistory: persisted ? persisted.sessionHistory : currentState.sessionHistory,
       letterStats: mergedStats,
+      prompt,
     });
   },
 
@@ -203,7 +277,10 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
       ...configOverride,
     } as SessionConfig;
 
-    const prompt = buildPrompt(config, state.letterStats);
+    const prompt =
+      state.status === "idle" && state.prompt && !configOverride
+        ? state.prompt
+        : buildPrompt(config, state.letterStats);
 
     set({
       config,

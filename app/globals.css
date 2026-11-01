@@ -1,21 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #050706;
-  --foreground: #d9ffe9;
+  --background: #090c10;
+  --foreground: #e6edf3;
+  --terminal-bg: #0d1117;
+  --terminal-border: #30363d;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-mono: "IBM Plex Mono", "JetBrains Mono", "Fira Code", "Menlo", "Monaco", "Consolas", monospace;
+  --font-mono: "JetBrains Mono", "Fira Code", "IBM Plex Mono", "SF Mono", "Menlo", "Consolas", monospace;
 }
 
 body {
-  background:
-    radial-gradient(circle at 20% -10%, rgba(16, 185, 129, 0.1), transparent 35%),
-    radial-gradient(circle at 85% 120%, rgba(14, 165, 233, 0.08), transparent 35%),
-    var(--background);
+  background-color: var(--background);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.05), transparent 45%),
+    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 24px 24px;
   color: var(--foreground);
   font-family: var(--font-mono);
 }
@@ -23,5 +26,33 @@ body {
 html,
 body {
   height: 100%;
-  overflow: hidden;
+}
+
+@keyframes terminal-blink {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+.terminal-cursor-blink {
+  animation: terminal-blink 1s cubic-bezier(1, 0, 0, 1) infinite;
+}
+
+/* Custom terminal scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+::-webkit-scrollbar-thumb {
+  background: #21262d;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #30363d;
 }

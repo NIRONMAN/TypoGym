@@ -1,143 +1,172 @@
 "use client";
 
-import { FINGER_MAP, useTypingSession } from "@/store";
-import { ALPHABET, PracticeMode, TargetType } from "@/lib/typingEngine";
+import { PracticeMode } from "@/lib/typingEngine";
+import { useTypingSession } from "@/store";
 
-const DURATIONS = [30, 60, 120];
+const DURATIONS = [15, 30, 60, 120];
 
-function ModeControls() {
+function formatClock(totalSec: number): string {
+  const safe = Math.max(0, totalSec);
+  const minutes = Math.floor(safe / 60)
+    .toString()
+    .padStart(2, "0");
+  const seconds = Math.floor(safe % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+export function TopControls() {
   const config = useTypingSession((state) => state.config);
   const status = useTypingSession((state) => state.status);
-
+  const remainingSec = useTypingSession((state) => state.remainingSec);
   const setMode = useTypingSession((state) => state.setMode);
   const setDuration = useTypingSession((state) => state.setDuration);
-  const setTargetType = useTypingSession((state) => state.setTargetType);
-  const setTargetId = useTypingSession((state) => state.setTargetId);
-  const startSession = useTypingSession((state) => state.startSession);
+
+  const isRunning = status === "running";
+  const clockSeconds = status === "idle" ? config.durationSec : remainingSec;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center justify-between gap-4 py-1 font-mono text-xs transition-opacity duration-300 ${
+        isRunning ? "opacity-60 hover:opacity-100" : "opacity-100"
+      }`}
+    >
+      {/* Mode & Duration Selectors */}
+      <div className="flex flex-wrap items-center gap-6 text-zinc-500">
+        {/* Mode Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-zinc-600">mode</span>
+          <div className="flex items-center gap-1">
+            {(["normal", "targeted"] as PracticeMode[]).map((mode) => {
+              const selected = config.mode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setMode(mode)}
+                  className={`rounded px-2 py-0.5 transition ${
+                    selected
+                      ? "bg-zinc-800 font-semibold text-emerald-400"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {mode}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Duration Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-zinc-600">time</span>
+          <div className="flex items-center gap-1">
+            {DURATIONS.map((sec) => {
+              const selected = config.durationSec === sec;
+              return (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => setDuration(sec)}
+                  className={`rounded px-1.5 py-0.5 transition ${
+                    selected
+                      ? "bg-zinc-800 font-semibold text-cyan-400"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {sec}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Focused Timer */}
+      <div className="flex items-center gap-2 font-mono">
+        <span
+          className={`text-sm font-semibold tracking-wider transition-colors ${
+            isRunning ? "text-emerald-400" : "text-zinc-500"
+          }`}
+        >
+          {formatClock(clockSeconds)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+interface BottomControlsProps {
+  onToggleStats?: () => void;
+  showStats?: boolean;
+}
+
+export function BottomControls({ onToggleStats, showStats }: BottomControlsProps) {
+  const status = useTypingSession((state) => state.status);
   const restartSession = useTypingSession((state) => state.restartSession);
   const endSession = useTypingSession((state) => state.endSession);
 
   const isRunning = status === "running";
 
   return (
-    <section className="rounded-xl border border-emerald-700/70 bg-[#0b1210] p-4 text-emerald-100">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-        <div className="rounded-lg border border-emerald-900/70 bg-emerald-950/20 p-3">
-          <div className="font-mono text-xs tracking-wide text-emerald-400">MODE</div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {["normal", "targeted"].map((mode) => {
-              const typedMode = mode as PracticeMode;
-              const selected = config.mode === typedMode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setMode(typedMode)}
-                  className={`rounded border px-3 py-2 font-mono text-sm transition ${
-                    selected
-                      ? "border-emerald-300 bg-emerald-300/20 text-emerald-100"
-                      : "border-emerald-900 bg-emerald-950/40 text-emerald-400 hover:border-emerald-700"
-                  }`}
-                >
-                  {mode.toUpperCase()}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+    <div className="flex flex-wrap items-center justify-between gap-4 py-2 font-mono text-xs text-zinc-500">
+      {/* Quick Action Controls */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={restartSession}
+          className="flex items-center gap-1.5 rounded border border-zinc-800/80 bg-zinc-900/60 px-3 py-1.5 text-zinc-300 transition hover:border-zinc-700 hover:text-white active:scale-95"
+        >
+          <span>↺</span>
+          <span>restart</span>
+        </button>
 
-        <div className="rounded-lg border border-cyan-900/60 bg-cyan-950/20 p-3">
-          <div className="font-mono text-xs tracking-wide text-cyan-400">DURATION</div>
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {DURATIONS.map((duration) => {
-              const selected = config.durationSec === duration;
-              return (
-                <button
-                  key={duration}
-                  type="button"
-                  onClick={() => setDuration(duration)}
-                  className={`rounded border px-3 py-2 font-mono text-sm transition ${
-                    selected
-                      ? "border-cyan-300 bg-cyan-300/20 text-cyan-100"
-                      : "border-cyan-900 bg-cyan-950/40 text-cyan-400 hover:border-cyan-700"
-                  }`}
-                >
-                  {duration}s
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-start justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => startSession()}
-            className="rounded border border-emerald-500 bg-emerald-500/20 px-3 py-2 font-mono text-sm text-emerald-100"
-          >
-            START
-          </button>
-          <button
-            type="button"
-            onClick={restartSession}
-            className="rounded border border-amber-500 bg-amber-500/20 px-3 py-2 font-mono text-sm text-amber-100"
-          >
-            RESTART
-          </button>
+        {isRunning ? (
           <button
             type="button"
             onClick={() => endSession("manual")}
-            disabled={!isRunning}
-            className="rounded border border-red-500 bg-red-500/20 px-3 py-2 font-mono text-sm text-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded border border-rose-900/40 bg-rose-950/20 px-3 py-1.5 text-rose-300 transition hover:bg-rose-950/40 active:scale-95"
           >
-            END
+            <span>⏹</span>
+            <span>stop</span>
           </button>
-        </div>
+        ) : null}
+
+        {onToggleStats ? (
+          <button
+            type="button"
+            onClick={onToggleStats}
+            className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 transition ${
+              showStats
+                ? "bg-zinc-800 text-cyan-300"
+                : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            <span>{showStats ? "⌨ typing" : "📊 stats"}</span>
+          </button>
+        ) : null}
       </div>
 
-      {config.mode === "targeted" ? (
-        <div className="mt-3 grid gap-2 rounded-lg border border-slate-800 bg-[#0a1016] p-3 md:grid-cols-[220px_minmax(0,1fr)]">
-          <label className="font-mono text-xs tracking-wide text-slate-400">TARGET MODE</label>
-          <div className="grid gap-2 md:grid-cols-2">
-            <select
-              value={config.targetType ?? "letter"}
-              onChange={(event) => setTargetType(event.target.value as TargetType)}
-              className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-2 font-mono text-sm text-slate-100"
-            >
-              <option value="letter">LETTER</option>
-              <option value="finger">FINGER</option>
-            </select>
-
-            {config.targetType === "finger" ? (
-              <select
-                value={config.targetId ?? "left-index"}
-                onChange={(event) => setTargetId(event.target.value)}
-                className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-2 font-mono text-sm text-slate-100"
-              >
-                {Object.keys(FINGER_MAP).map((finger) => (
-                  <option key={finger} value={finger}>
-                    {finger}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <select
-                value={config.targetId ?? "a"}
-                onChange={(event) => setTargetId(event.target.value)}
-                className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-2 font-mono text-sm text-slate-100"
-              >
-                {ALPHABET.map((letter) => (
-                  <option key={letter} value={letter}>
-                    {letter.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-      ) : null}
-    </section>
+      {/* Quiet Key Shortcuts Hint */}
+      <div className="flex items-center gap-3 text-[11px] text-zinc-600">
+        <span>
+          <kbd className="text-zinc-400">tab</kbd> restart
+        </span>
+        <span>•</span>
+        <span>
+          <kbd className="text-zinc-400">esc</kbd> stop
+        </span>
+      </div>
+    </div>
   );
 }
 
-export default ModeControls;
+export default function ModeControls() {
+  return (
+    <div className="flex flex-col gap-2">
+      <TopControls />
+      <BottomControls />
+    </div>
+  );
+}
