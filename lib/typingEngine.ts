@@ -127,6 +127,17 @@ export interface CalendarDay {
   level: 0 | 1 | 2 | 3 | 4;
 }
 
+export interface PersonalBestRecord {
+  bestNetWpm: number;
+  bestAccuracy: number;
+  date: string;
+}
+
+export interface PersonalBests {
+  byDuration: Record<number, PersonalBestRecord>;
+  overallBestWpm: number;
+}
+
 export interface SessionDelta {
   wpmDelta: number;
   accuracyDelta: number;
@@ -564,6 +575,49 @@ export function getLetterMastery(stat: LetterStat, now = Date.now()): LetterMast
   };
 }
 
+export function formatDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function getDaysBetweenDateStrings(d1: string, d2: string): number {
+  const [y1, m1, day1] = d1.split("-").map(Number);
+  const [y2, m2, day2] = d2.split("-").map(Number);
+  const utc1 = Date.UTC(y1, m1 - 1, day1);
+  const utc2 = Date.UTC(y2, m2 - 1, day2);
+  return Math.round((utc2 - utc1) / (24 * 60 * 60 * 1000));
+}
+
+export function calculatePersonalBests(sessionHistory: SessionResult[]): PersonalBests {
+  const byDuration: Record<number, PersonalBestRecord> = {};
+  let overallBestWpm = 0;
+
+  for (const session of sessionHistory) {
+    if (session.netWpm > overallBestWpm) {
+      overallBestWpm = session.netWpm;
+    }
+    const duration = Math.max(1, Math.round((session.endedAt - session.startedAt) / 1000));
+    const standardDurations = [15, 30, 60, 120];
+    const closest = standardDurations.reduce((prev, curr) =>
+      Math.abs(curr - duration) < Math.abs(prev - duration) ? curr : prev,
+    );
+
+    const existing = byDuration[closest];
+    if (!existing || session.netWpm > existing.bestNetWpm) {
+      const d = new Date(session.endedAt);
+      byDuration[closest] = {
+        bestNetWpm: session.netWpm,
+        bestAccuracy: session.accuracy,
+        date: formatDateString(d),
+      };
+    }
+  }
+
+  return { byDuration, overallBestWpm };
+}
+
 export function calculateStreak(sessionHistory: SessionResult[], now = Date.now()): StreakInfo {
   if (sessionHistory.length === 0) {
     return { currentStreak: 0, longestStreak: 0, lastPracticedDate: null };
@@ -571,9 +625,7 @@ export function calculateStreak(sessionHistory: SessionResult[], now = Date.now(
 
   const dateSet = new Set<string>();
   sessionHistory.forEach((s) => {
-    const d = new Date(s.endedAt);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    dateSet.add(dateStr);
+    dateSet.add(formatDateString(new Date(s.endedAt)));
   });
 
   const uniqueDays = Array.from(dateSet).sort().reverse();
@@ -582,21 +634,22 @@ export function calculateStreak(sessionHistory: SessionResult[], now = Date.now(
   }
 
   const nowDate = new Date(now);
-  const todayStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}-${String(nowDate.getDate()).padStart(2, "0")}`;
+  const todayStr = formatDateString(nowDate);
 
-  const yesterday = new Date(now - 24 * 60 * 60 * 1000);
-  const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+  const yesterdayDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate() - 1);
+  const yesterdayStr = formatDateString(yesterdayDate);
 
   const lastPracticed = uniqueDays[0];
   let currentStreak = 0;
 
   if (lastPracticed === todayStr || lastPracticed === yesterdayStr) {
-    let checkDate = new Date(lastPracticed === todayStr ? now : yesterday.getTime());
+    const startObj = lastPracticed === todayStr ? nowDate : yesterdayDate;
+    let checkDate = new Date(startObj.getFullYear(), startObj.getMonth(), startObj.getDate());
     while (true) {
-      const checkStr = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, "0")}-${String(checkDate.getDate()).padStart(2, "0")}`;
+      const checkStr = formatDateString(checkDate);
       if (dateSet.has(checkStr)) {
         currentStreak += 1;
-        checkDate = new Date(checkDate.getTime() - 24 * 60 * 60 * 1000);
+        checkDate = new Date(checkDate.getFullYear(), checkDate.getMonth(), checkDate.getDate() - 1);
       } else {
         break;
       }
@@ -610,9 +663,7 @@ export function calculateStreak(sessionHistory: SessionResult[], now = Date.now(
     if (i === 0) {
       running = 1;
     } else {
-      const prev = new Date(sortedAsc[i - 1]).getTime();
-      const curr = new Date(sortedAsc[i]).getTime();
-      const diffDays = Math.round((curr - prev) / (24 * 60 * 60 * 1000));
+      const diffDays = getDaysBetweenDateStrings(sortedAsc[i - 1], sortedAsc[i]);
       if (diffDays === 1) {
         running += 1;
       } else if (diffDays > 1) {
@@ -640,8 +691,7 @@ export function buildConsistencyCalendar(
   const daysMap = new Map<string, { count: number; charsTyped: number }>();
 
   sessionHistory.forEach((s) => {
-    const d = new Date(s.endedAt);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const dateStr = formatDateString(new Date(s.endedAt));
     const existing = daysMap.get(dateStr) ?? { count: 0, charsTyped: 0 };
     daysMap.set(dateStr, {
       count: existing.count + 1,
@@ -653,11 +703,11 @@ export function buildConsistencyCalendar(
   const nowDate = new Date(now);
   const dayOfWeek = nowDate.getDay();
   const endOffsetDays = 6 - dayOfWeek;
-  const endDate = new Date(nowDate.getTime() + endOffsetDays * 24 * 60 * 60 * 1000);
+  const endDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate() + endOffsetDays);
 
   for (let i = totalDays - 1; i >= 0; i--) {
-    const d = new Date(endDate.getTime() - i * 24 * 60 * 60 * 1000);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const d = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() - i);
+    const dateStr = formatDateString(d);
     const data = daysMap.get(dateStr) ?? { count: 0, charsTyped: 0 };
     let level: 0 | 1 | 2 | 3 | 4 = 0;
     if (data.count >= 6) level = 4;

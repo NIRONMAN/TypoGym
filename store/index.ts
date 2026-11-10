@@ -4,6 +4,7 @@ import {
   buildConsistencyCalendar,
   buildProgressSummary,
   calculateMetrics,
+  calculatePersonalBests,
   calculateSessionDelta,
   calculateStreak,
   CalendarDay,
@@ -16,6 +17,7 @@ import {
   Letter,
   LetterMasteryInfo,
   LetterStat,
+  PersonalBests,
   pickWeakLettersForPrompt,
   PracticeMode,
   ProgressSummary,
@@ -88,6 +90,10 @@ interface TypingEngineState {
   getMastery: () => LetterMasteryInfo[];
   getAdaptiveLetters: () => ReturnType<typeof getAdaptiveWorkoutLetters>;
   getLastResultDelta: () => SessionDelta | null;
+  getPersonalBests: () => PersonalBests;
+  exportProgress: () => string;
+  importProgress: (jsonStr: string) => boolean;
+  clearProgress: () => void;
 }
 
 const DEFAULT_CONFIG: SessionConfig = {
@@ -446,7 +452,12 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
     }
 
     if (key === "backspace") {
-      if (state.cursorIndex > 0) {
+      if (state.currentError) {
+        set({
+          currentError: false,
+          charFocusStartedAt: ts,
+        });
+      } else if (state.cursorIndex > 0) {
         set({
           cursorIndex: state.cursorIndex - 1,
           correctChars: Math.max(0, state.correctChars - 1),
@@ -530,6 +541,7 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
     set({
       errors: state.errors + 1,
       currentError: true,
+      charFocusStartedAt: ts,
     });
   },
 
@@ -568,6 +580,62 @@ export const useTypingSession = create<TypingEngineState>((set, get) => ({
     const state = get();
     if (!state.lastResult) return null;
     return calculateSessionDelta(state.lastResult, state.sessionHistory, state.letterStats);
+  },
+
+  getPersonalBests: () => calculatePersonalBests(get().sessionHistory),
+
+  exportProgress: () => {
+    const state = get();
+    const data: PersistedProgress = {
+      sessionHistory: state.sessionHistory,
+      letterStats: state.letterStats,
+    };
+    return JSON.stringify(data, null, 2);
+  },
+
+  importProgress: (jsonStr: string) => {
+    try {
+      const parsed = JSON.parse(jsonStr) as PersistedProgress;
+      if (!parsed || !parsed.letterStats || !Array.isArray(parsed.sessionHistory)) {
+        return false;
+      }
+      const fallbackStats = createDefaultLetterStats();
+      const mergedStats = { ...fallbackStats };
+      ALPHABET.forEach((letter) => {
+        if (parsed.letterStats[letter]) {
+          mergedStats[letter] = {
+            ...fallbackStats[letter],
+            ...parsed.letterStats[letter],
+          };
+        }
+      });
+
+      persistProgress({
+        sessionHistory: parsed.sessionHistory,
+        letterStats: mergedStats,
+      });
+
+      set({
+        sessionHistory: parsed.sessionHistory,
+        letterStats: mergedStats,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  clearProgress: () => {
+    const defaultStats = createDefaultLetterStats();
+    persistProgress({
+      sessionHistory: [],
+      letterStats: defaultStats,
+    });
+    set({
+      sessionHistory: [],
+      letterStats: defaultStats,
+      lastResult: null,
+    });
   },
 }));
 

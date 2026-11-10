@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Analytics from "@/components/Analytics";
 import { useTypingSession } from "@/store";
 
@@ -76,6 +76,7 @@ export default function Terminal({ externalTab, onTabChange }: TerminalProps) {
 
   const [activeTab, setActiveTabState] = useState<"arena" | "telemetry">("arena");
   const [windowStartLine, setWindowStartLine] = useState(0);
+  const virtualInputRef = useRef<HTMLInputElement>(null);
 
   const currentTab = externalTab ?? activeTab;
   const setTab = useCallback(
@@ -111,7 +112,7 @@ export default function Terminal({ externalTab, onTabChange }: TerminalProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       const activeElement = document.activeElement as HTMLElement | null;
       const isInteractiveTag =
-        activeElement?.tagName === "INPUT" ||
+        (activeElement?.tagName === "INPUT" && activeElement.id !== "typogym-virtual-input") ||
         activeElement?.tagName === "TEXTAREA" ||
         activeElement?.tagName === "SELECT" ||
         activeElement?.isContentEditable;
@@ -220,7 +221,21 @@ export default function Terminal({ externalTab, onTabChange }: TerminalProps) {
   const fillerLineCount = Math.max(0, VISIBLE_LINES - visibleLines.length);
 
   return (
-    <div className="flex w-full flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-[#0d1117] shadow-xl">
+    <div
+      onClick={() => virtualInputRef.current?.focus()}
+      className="flex w-full flex-col overflow-hidden rounded-xl border border-zinc-800/80 bg-[#0d1117] shadow-xl cursor-text"
+    >
+      <input
+        ref={virtualInputRef}
+        id="typogym-virtual-input"
+        type="text"
+        className="sr-only"
+        aria-label="Virtual keyboard input target"
+        autoCapitalize="none"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+      />
       {/* Clean Window Titlebar */}
       <div className="flex items-center justify-between border-b border-zinc-800/80 bg-[#161b22]/70 px-4 py-2.5 select-none">
         {/* Left: Clean Traffic Lights */}

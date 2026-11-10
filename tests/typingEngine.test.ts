@@ -8,6 +8,7 @@ import {
   buildConsistencyCalendar,
   buildProgressSummary,
   calculateMetrics,
+  calculatePersonalBests,
   calculateSessionDelta,
   calculateStreak,
   createDefaultLetterStats,
@@ -254,4 +255,18 @@ test("generateTargetedPrompt supports cluster targetType", () => {
   assert.ok(words.length >= 15);
   const hasClusterLetters = words.some((w) => w.includes("z") || w.includes("q") || w.includes("x"));
   assert.ok(hasClusterLetters);
+});
+
+test("calculatePersonalBests identifies highest net WPM and accuracy by duration", () => {
+  const sessions = [
+    { startedAt: 0, endedAt: 30000, netWpm: 75, grossWpm: 78, accuracy: 96, charsTyped: 200, errors: 2, modeMeta: { mode: "normal" as const } },
+    { startedAt: 100000, endedAt: 130000, netWpm: 88, grossWpm: 90, accuracy: 98, charsTyped: 220, errors: 1, modeMeta: { mode: "normal" as const } },
+    { startedAt: 200000, endedAt: 260000, netWpm: 82, grossWpm: 85, accuracy: 97, charsTyped: 410, errors: 3, modeMeta: { mode: "normal" as const } },
+  ];
+
+  const pbs = calculatePersonalBests(sessions);
+  assert.equal(pbs.overallBestWpm, 88);
+  assert.equal(pbs.byDuration[30]?.bestNetWpm, 88);
+  assert.equal(pbs.byDuration[30]?.bestAccuracy, 98);
+  assert.equal(pbs.byDuration[60]?.bestNetWpm, 82);
 });
