@@ -45,7 +45,7 @@ Built with Next.js 15 App Router, React 19, and Tailwind CSS 4, TypoGym combines
 
 | Environment | Link | Description |
 | :--- | :--- | :--- |
-| **Production Demo** | [typogym.vercel.app](https://typogym.vercel.app) *(or your deployed domain)* | Live production deployment |
+| **Production Demo** | Self-hostable via `NEXT_PUBLIC_SITE_URL` | Live production deployment |
 | **Local Workbench** | `http://localhost:3000` | Default local development instance |
 
 > **Deploy to Vercel in 1-Click:**
@@ -254,7 +254,7 @@ npm run start
 
 ### Production Deployment Checklist
 
-1. **Environment Setup:** Set `NEXT_PUBLIC_SITE_URL` to your production URL in your deployment provider (e.g., `https://typogym.vercel.app`).
+1. **Environment Setup:** Set `NEXT_PUBLIC_SITE_URL` to your production URL in your deployment provider (e.g., your custom domain or localhost).
 2. **Quality Gates:** Verify that both `npm run lint` and `npm run test` pass cleanly.
 3. **PWA & Search Assets:** Confirm that `/robots.txt`, `/sitemap.xml`, and `/manifest.webmanifest` are served with correct headers.
 4. **Deploy:** Deploy seamlessly to [Vercel](https://vercel.com/), [Railway](https://railway.app/), [Render](https://render.com/), or any containerized Node.js environment.
@@ -304,7 +304,7 @@ All telemetry is serialized into human-readable JSON under the `typogym-progress
 
 Crafted with care by **Niranjan Dabhade**:
 
-- 🌐 **Portfolio:** [niranjandabhade.dev](https://niranjandabhade.dev)
+- 🌐 **Portfolio:** [nironman.com](https://nironman.com)
 - 🐙 **GitHub:** [@NIRONMAN](https://github.com/NIRONMAN)
 - 💼 **LinkedIn:** [Niranjan Dabhade](https://www.linkedin.com/in/niranjan-dabhade/)
 
